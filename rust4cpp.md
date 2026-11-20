@@ -1,27 +1,41 @@
 # C++ 개발자를 위한 Rust 안내서
 
-C++ 하던 사람이 Rust를 처음 열면 두 가지 벽을 만납니다. 문법은 그럭저럭 읽히는데 컴파일러가 계속 "안 됩니다"라고 말하는 벽, 그리고 왜 그런 제약을 굳이 두었는지 이해가 안 되는 벽입니다. 이 문서는 두 번째 벽을 먼저 허무는 데 목적이 있습니다. 제약의 이유를 한 번 이해하고 나면, 첫 번째 벽은 훨씬 빨리 넘어갑니다.
+> 기준: Rust 2024 Edition · Stable Rust · C++17/20/23 관점
 
-C++과 Rust는 목표가 같습니다. 가비지 컬렉터 없이, 성능을 그대로 두고, 자원을 정확히 회수하는 것. 다른 건 그 목표에 도달하는 방식입니다. C++은 개발자에게 자유를 주고 규칙을 머릿속에 두게 하고, Rust는 그 규칙을 컴파일러에게 넘깁니다. 자유를 잠시 내려놓는 대신, 런타임 사고를 컴파일 타임 오류로 바꿔 받는 거래입니다.
+이 문서는 모던 C++ 개발자가 Rust를 학습할 때 필요한 개념과 설계 차이를 설명합니다. 문법을 일대일로 번역하는 데 그치지 않고, C++에서 익숙한 RAII, 값 의미론, 참조, 스마트 포인터, 템플릿, 예외 처리 등이 Rust에서는 어떤 모델로 표현되는지 살펴봅니다.
 
-**목차**
+두 언어 모두 가비지 컬렉터 없이 자원과 메모리를 관리하고 높은 성능을 목표로 합니다. 핵심 차이는 안전성을 확보하는 방식입니다. C++은 개발자에게 폭넓은 제어권을 주는 대신 규칙 준수를 요구하고, Rust는 소유권·대여·타입 시스템을 통해 안전한 코드의 상당 부분을 컴파일 타임에 검증합니다.
+
+이 문서는 다음 원칙으로 구성합니다.
+
+- **대응 관계는 참고용이다.** C++의 기능과 Rust의 기능이 비슷해 보여도 의미와 보장 수준이 다를 수 있습니다.
+- **안전성과 동작을 구분한다.** 안전한 Rust의 보장과 `unsafe`, FFI, 런타임 패닉이 개입하는 경우를 구분합니다.
+- **실무에서 필요한 흐름을 다룬다.** 소유권뿐 아니라 테스트, 동시성, 비동기, FFI, 프로젝트 구성까지 연결합니다.
+- **예제는 개념 중심이다.** 각 코드 블록은 설명을 위한 예제이며, 여러 블록을 하나의 파일에 그대로 붙여 실행하는 프로젝트 예제와는 구분합니다.
+
+## 목차
 
 | 장 | 제목 | C++ 대응 |
 | :--- | :--- | :--- |
-| 1 | 두 언어의 성격 차이 | RAII와 예외 안전성 문화 |
-| 2 | 개발 환경: CMake 대신 Cargo | `CMake` · `vcpkg` · `Makefile` |
-| 3 | 변수, 함수, 그리고 값이 되는 문장 | `auto` · 함수 선언 · `?:` |
-| 4 | 타입과 문자열 | `char` · `std::string` · `std::string_view` |
-| 5 | 소유권과 대여 검사기 | 소멸자 · `T&` · 댕글링 포인터 |
-| 6 | 포인터와 스마트 포인터 | `T*` · `unique_ptr` |
-| 7 | 데이터와 행위의 분리 | `class` · 멤버 함수 |
-| 8 | 트레이트와 다형성 | `template` · `virtual` · 컨셉트 |
-| 9 | 표준 트레이트 | 복사/이동 생성자 · `operator==` |
-| 10 | 모듈 시스템 | 헤더 · `namespace` · `#include` |
-| 11 | 에러 처리 | 예외 · `std::error_code` |
-| 12 | 마무리: C++ 개발자가 Rust로 넘어갈 때 | 이동 의미론 · `const` 정확성 |
+| 1 | 두 언어의 성격 차이 | RAII와 예외 안전성 |
+| 2 | 개발 환경: Cargo | CMake · Conan · vcpkg |
+| 3 | 변수, 함수, 표현식 | `auto` · 함수 · `?:` |
+| 4 | 타입과 컬렉션 | `std::string` · `vector` · `span` |
+| 5 | 소유권과 대여 검사기 | 이동 의미론 · 참조 · 수명 |
+| 6 | 포인터와 스마트 포인터 | `unique_ptr` · `shared_ptr` · `weak_ptr` |
+| 7 | 데이터 모델과 패턴 매칭 | `class` · `enum` · `variant` |
+| 8 | 트레이트와 다형성 | 템플릿 · Concepts · `virtual` |
+| 9 | 표준 트레이트 | 특수 멤버 함수 · 연산자 오버로딩 |
+| 10 | 모듈과 패키지 | 헤더 · namespace · CMake |
+| 11 | 에러 처리 | 예외 · `std::error_code` · `std::expected` |
+| 12 | C++ 개발자의 전환 가이드 | 모던 C++ 설계 관점 |
+| 13 | 테스트와 품질 도구 | CTest · GoogleTest · 정적 분석 |
+| 14 | 동시성 프로그래밍 | `std::thread` · `mutex` · atomic |
+| 15 | 비동기 프로그래밍 | `std::future` · coroutine |
+| 16 | C/C++ 연동과 `unsafe` | C ABI · 포인터 · FFI |
+| 17 | 실무 학습 로드맵 | 프로젝트 전환 |
 
-5번(소유권)이 이 문서의 심장입니다. 급하면 거기부터 읽어도 됩니다.
+**가장 중요한 장은 5장(소유권과 대여)입니다.** 다만 6장(스마트 포인터), 8장(트레이트), 11장(`Result`)까지 연결해서 읽어야 실제 설계에 적용할 수 있습니다.
 
 ---
 
@@ -37,20 +51,20 @@ C++ 진영의 조언은 대부분 "절대 하지 마라" 형태입니다. *Effec
 
 Rust는 같은 항목을 컴파일러가 직접 검사합니다. 금지 사항을 외울 필요가 없습니다. 대신 타입 시스템과 관용구를 이해해야 하고, 그게 이 문서의 내용입니다.
 
-| 비교 항목 | C++ (11/14/17/20) | Rust (2018/2021) |
+| 비교 항목 | C++ (17/20/23) | Rust (2021/2024) |
 | :--- | :--- | :--- |
 | **메모리 안전성** | 개발자 주의 + 리뷰 + 정적 분석 도구 | 컴파일러의 대여 검사기가 강제 |
 | **자원 관리** | RAII, 소멸자 `~T()` | 소유권 + `Drop` 트레이트 |
 | **기본 가변성** | 기본 가변, 필요하면 `const` | 기본 불변, 필요하면 `let mut` |
 | **동시성 안전성** | 런타임 동기화(`std::mutex` 등)에 의존 | `Send` / `Sync`로 컴파일 타임에 데이터 경합 차단 |
 
-> **C++ 감각으로는** 자유도가 낮아진 게 아니라, 실수할 수 있는 지점이 줄어든 것입니다. 컴파일이 통과했다면 데이터 경합과 댕글링 참조는 없다고 봐도 됩니다. 물론 `unsafe` 블록을 쓰면 그 보장은 잠시 사라집니다.
+> **C++ 감각으로는** 자유도가 낮아진 게 아니라, 실수할 수 있는 지점이 줄어든 것입니다. 안전한 Rust 코드만으로 구성된 부분에서는 데이터 경합과 댕글링 참조 같은 핵심 메모리 안전성 문제가 방지됩니다. `unsafe` 구현, FFI, 잘못된 외부 계약은 별도 검토가 필요합니다. 물론 `unsafe` 블록을 쓰면 그 보장은 잠시 사라집니다.
 
 > **팁** 처음 며칠은 컴파일 에러가 C++보다 훨씬 많이 나옵니다. 정상입니다. 그 에러들은 원래 C++에서 런타임에 터졌을 사고들입니다.
 
 **한 줄 정리**
 - Rust의 제약은 벌칙이 아니라 사고 예방이다.
-- 컴파일 통과 = 메모리 안전성 검사 통과라고 생각하면 마음이 편하다.
+- 안전한 Rust 코드의 메모리 안전성 규칙을 컴파일러가 검사했다고 이해하는 편이 정확하다. `unsafe`, FFI, 외부 라이브러리의 계약 위반까지 자동으로 증명하는 것은 아니다.
 
 ---
 
@@ -79,13 +93,27 @@ cargo run     # 빌드하고 실행
 cargo test    # 테스트 실행
 ```
 
-> **C++ 감각으로는** `CMakeLists.txt` + `vcpkg.json` + `conanfile.txt`가 `Cargo.toml` 한 파일로 합쳐진 셈입니다. `#include` 경로 설정, 링크 순서, 라이브러리 탐색 실패를 고민할 일이 거의 없습니다.
+> **C++ 감각으로는** `Cargo.toml`은 패키지 메타데이터와 의존성·타깃 설정의 중심 파일입니다. 다만 CMake의 모든 기능을 대체하는 단일 파일은 아닙니다. 복잡한 네이티브 빌드에는 `build.rs`, `.cargo/config.toml`, workspace 설정 등이 함께 쓰입니다. `#include` 경로 설정, 링크 순서, 라이브러리 탐색 실패를 고민할 일이 거의 없습니다.
 
 > **팁** `cargo check`를 습관으로 만드세요. 빌드보다 몇 배 빠르고, 소유권 에러는 99% 여기서 잡힙니다.
 
 **한 줄 정리**
 - `rustup`은 툴체인, `cargo`는 빌드와 의존성, `cargo check`는 빠른 피드백.
-- 새 프로젝트는 `cargo new`, 빌드 설정 파일은 `Cargo.toml` 하나뿐이다.
+- 새 프로젝트는 `cargo new`로 시작하고, 패키지 메타데이터와 의존성은 `Cargo.toml`에서 관리한다.
+
+#### Edition과 컴파일러 버전
+
+Rust의 Edition은 언어 문법과 의미의 호환성 경계이며, 컴파일러 버전과는 다른 개념입니다. 2024 Edition은 Rust 1.85부터 안정화되었습니다. 새 프로젝트는 특별한 호환성 요구가 없다면 `edition = "2024"`를 기준으로 시작할 수 있습니다.
+
+```toml
+[package]
+name = "my_project"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85" # 프로젝트가 요구하는 최소 Rust 버전의 예
+```
+
+`rust-version`은 최소 지원 컴파일러 버전을 선언하는 필드입니다. 실제 프로젝트에서는 사용하는 의존성과 CI 환경을 고려해 결정하세요.
 
 ---
 
@@ -104,8 +132,8 @@ cargo test    # 테스트 실행
 | `constexpr T x` | 불변(컴파일 타임) | 일부 | 컴파일 타임 필수 | C++11 이상 |
 | `let x` | 불변 | 지원 | 런타임 가능 | Rust 기본, 섀도잉 가능 |
 | `let mut x` | 가변 | 지원 | 런타임 가능 | 값만 변경(타입 고정) |
-| `const X: T` | 불변(컴파일 타임) | 불가(타입 필수) | 컴파일 타임 필수 | 인라인 치환, 섀도잉 불가 |
-| `static X: T` | 불변(`mut` 가능) | 불가(타입 필수) | 컴파일 타임 / `'static` | 고정 주소, `static mut`은 `unsafe` |
+| `const X: T` | 불변 상수 | 타입 필수 | 상수 표현식 필요 | 값은 컴파일 시 평가되며 일반 변수처럼 저장 위치를 보장하지 않음 |
+| `static X: T` | 기본 불변 | 타입 필수 | 정적 수명 | 고정된 메모리 위치를 가짐. `static mut` 접근은 최신 Rust에서 엄격한 `unsafe` 규칙 적용 |
 
 ### 3.1. `let`과 `let mut` (C++: `auto` · `const`)
 
@@ -369,7 +397,7 @@ Rust의 정수와 부동소수점은 C++11의 고정 크기 타입과 사실상 
 | `double` / `float` | `f64` / `f32` | IEEE 754 64비트 / 32비트 |
 | `char` (1바이트) | `u8` 또는 `char` | C++ `char`는 1바이트, Rust `char`는 4바이트 유니코드 |
 
-> **주의** Rust의 `char`는 UTF-32 한 글자입니다. `'A'`도 4바이트, `'한'`도 4바이트입니다. 1바이트 문자가 필요하면 `u8`을 쓰세요. C++ 감각으로 `char`를 쓰면 크기에서 어긋납니다.
+> **주의** Rust의 `char`는 UTF-32 인코딩 단위라기보다 **Unicode scalar value 하나**를 나타내는 4바이트 타입입니다. `'A'`와 `'한'` 모두 `char` 하나지만, 사용자에게 보이는 글자(grapheme cluster)는 여러 `char`로 구성될 수 있습니다. UTF-8 바이트 단위가 필요하면 `u8`을 사용하세요. C++ 감각으로 `char`를 쓰면 크기에서 어긋납니다.
 
 ### 4.2. `String`과 `&str` (C++: `std::string` 소유 · `string_view` 대여)
 
@@ -511,7 +539,7 @@ C++은 `int`를 `double`에 넣으면 알아서 해줍니다. Rust는 안 해줍
 | :--- | :--- | :--- |
 | 정수끼리 강제 변환 | `x as T` | 범위 검사 없음. 넘치면 상위 비트가 잘린다 |
 | float → 정수 변환 | `x as T` | 0 방향 절단. 범위를 벗어나면 포화(최소/최대), NaN은 0 |
-| 손실 없는 변환 | `T::from(x)` / `x.into()` | 손실 가능성이 있으면 애초에 구현되지 않는다 |
+| 실패하지 않는 변환 | `T::from(x)` / `x.into()` | `From`은 실패하지 않는 변환 계약이지, 모든 도메인에서 수학적으로 무손실임을 보장하는 것은 아님 |
 | 실패할 수 있는 변환 | `T::try_from(x)` / `x.try_into()` | 실패 시 `Err` 반환 |
 | 포인터 변환 | `ptr as *const T` | 역참조는 `unsafe` 필요 |
 
@@ -752,7 +780,7 @@ println!("{}", t && f);  // false
 
 ```rust
 // 디버그 빌드: 넘치면 panic (원인을 바로 알려줌)
-// 릴리스 빌드: 2의 보수 랩어라운드
+// 기본 릴리스 프로파일(오버플로 검사 비활성): 랩어라운드
 let mut v: u8 = 250;
 v += 10;
 
@@ -762,7 +790,7 @@ let c = 250u8.checked_add(10);      // None (실패를 값으로)
 let s = 250u8.saturating_add(10);   // 255 (최대값에서 멈춤)
 ```
 
-> **주의** C++의 unsigned는 오버플로가 언어 차원에서 정의된 랩어라운드이고, signed는 UB입니다. Rust는 **디버그에서 패닉**입니다. "릴리스에서만 도는 코드"를 디버그로 시험하면 여기서 갈립니다. 오버플로가 정상 동작인 코드라면 `wrapping_add`로 의도를 남기세요.
+> **주의** C++의 unsigned 정수 오버플로는 모듈러 연산으로 정의되고 signed 정수 오버플로는 UB입니다. Rust의 일반 정수 연산은 오버플로 검사 설정에 따라 달라집니다. 기본 디버그 프로파일은 보통 panic, 기본 릴리스 프로파일은 래핑 동작을 사용하지만 `overflow-checks` 설정으로 바꿀 수 있습니다. "릴리스에서만 도는 코드"를 디버그로 시험하면 여기서 갈립니다. 오버플로가 정상 동작인 코드라면 `wrapping_add`로 의도를 남기세요.
 
 > **C++ 감각으로는** `unsigned`의 조용한 랩어라운드에 의존하던 코드는 Rust에서 디버그 빌드가 즉시 터집니다. 좋은 의미의 차이입니다. 조용한 버그가 시끄러운 버그로 바뀌는 것뿐입니다.
 
@@ -770,7 +798,7 @@ let s = 250u8.saturating_add(10);   // 255 (최대값에서 멈춤)
 - 리터럴에 타입을 붙일 수 있다. `34u8`, `0b1010_1010`.
 - 추론 기본값은 `i32`, `f64`.
 - `++`/`--`는 없다. `+= 1`을 쓴다.
-- 오버플로는 디버그에서 패닉, 릴리스에서 랩어라운드.
+- 오버플로 동작은 `overflow-checks` 설정에 좌우된다. 기본 디버그는 검사하고 기본 릴리스는 래핑한다.
 
 ### 4.7. 슬라이스의 실체와 성능 이야기 (C++: `std::span` · 포인터 + 길이)
 
@@ -871,7 +899,7 @@ let b = a;              // 1KB 복사. 힙 할당 없음
 
 **한 줄 요약: 값마다 주인이 하나뿐이고, 주인이 사라지면 값도 사라집니다. 빌려 쓰는 동안에는 규칙이 붙습니다.**
 
-이 절이 Rust가 C++과 가장 크게 갈리는 지점입니다. C++11의 `std::move`도 이동을 도입했지만, 이동한 뒤의 객체는 여전히 "유효하지만 의미 없는" 상태로 남습니다. 소멸자는 호출되고, 실수로 접근하면 조용히 이상한 값이 나옵니다. Rust는 이동한 쪽을 아예 못 쓰게 만듭니다.
+이 절이 Rust가 C++과 가장 크게 갈리는 지점입니다. C++의 이동 후 객체는 일반적으로 **유효하지만 상태가 지정되지 않은(valid but unspecified)** 상태입니다. 타입이 문서화한 불변식은 유지되지만, 이동 전 값이나 구체적인 내용에 의존해서는 안 됩니다. Rust는 비-`Copy` 값을 이동한 뒤 원래 바인딩의 재사용을 타입 검사로 막습니다. 소멸자는 호출되고, 실수로 접근하면 조용히 이상한 값이 나옵니다. Rust는 이동한 쪽을 아예 못 쓰게 만듭니다.
 
 택배 상자로 생각해 보세요. 상자는 한 사람만 들 수 있습니다. 옆 사람에게 넘기면 내 손에는 없습니다. 남의 상자를 보기만 하려면 잠깐 열어 보면 되지만, 내가 상자에 물건을 넣고 있는 동안에는 다른 사람이 동시에 열어 보면 안 됩니다. Rust는 이 규칙을 컴파일러가 지킵니다.
 
@@ -1101,9 +1129,9 @@ C++에서 `std::unique_ptr`, `std::shared_ptr`를 쓰던 자리에 그대로 대
 
 | Rust | C++ 대응 | 한 줄 설명 |
 | :--- | :--- | :--- |
-| `Box<T>` | `std::unique_ptr<T>` | 힙에 두고 소유자는 하나. 크기 0 오버헤드 |
-| `Rc<T>` | (단일 스레드용 `shared_ptr`) | 참조 카운트, 원자적 연산 없음. `Send` 아님. **공유한 값은 불변** |
-| `Arc<T>` | `std::shared_ptr<T>` | 원자적 참조 카운트. 멀티 스레드 안전 |
+| `Box<T>` | `std::unique_ptr<T>` | 단독 소유 힙 할당. 포인터 크기 수준의 표현이며, 할당 자체 비용은 존재 |
+| `Rc<T>` | 단일 스레드용 `shared_ptr` | 비원자적 참조 카운트. 기본 공유 접근은 불변이며, `RefCell<T>` 등으로 내부 가변성을 구성할 수 있음 |
+| `Arc<T>` | `std::shared_ptr<T>` | 원자적 참조 카운트. 내부 데이터의 스레드 안전성은 `T`와 동기화 방식에 달림 |
 | `*const T` / `*mut T` | `const T*` / `T*` | 원시 포인터. 역참조는 `unsafe` |
 
 `Box`는 "이사 박스에 넣어 창고에 두기"입니다. 값은 힙에 있고, 스택에는 주소만 있습니다. 재귀 구조체나 큰 값을 옮길 때 씁니다. `Rc`와 `Arc`는 "공동 소유 계약서에 이름을 여러 개 올리기"입니다. 마지막 이름이 지워질 때 값이 해제됩니다.
@@ -1154,7 +1182,7 @@ fn main() {
 
 | | `Cell<T>` | `RefCell<T>` |
 | :--- | :--- | :--- |
-| 대상 타입 | `Copy` 타입 | 모든 타입 |
+| 대상 타입 | 모든 `T`를 감쌀 수 있음. `get()`은 `T: Copy`일 때만 제공 | 모든 타입 |
 | 접근 방식 | `get()`(복사) / `set()` | `borrow()` / `borrow_mut()` |
 | 검사 시점 | 없음(복사라 충돌이 없음) | 런타임 대여 검사 |
 | 위반 시 | 해당 없음 | `panic!` |
@@ -1207,13 +1235,13 @@ fn main() {
 
 > **주의** `borrow_mut()`을 두 번 겹쳐 부르면 런타임 panic입니다. 컴파일러가 잡아주지 않으니, 빌림이 겹치지 않게 스코프를 짧게 유지하세요. 실패해도 되는 자리라면 `try_borrow_mut()`이 `Result`를 돌려줍니다.
 
-> **주의** `RefCell<T>`은 `Send`가 아닙니다. 스레드 사이로 넘기려면 `Mutex<T>`를 씁니다. 단일 스레드에서 `Arc<Mutex<T>>`를 쓰는 건 정확하지만 과합니다. 그 자리는 `Rc<RefCell<T>>`입니다.
+> **주의** `RefCell<T>`은 `T: Send`이면 소유권을 다른 스레드로 이동(`Send`)할 수 있지만, 여러 스레드에서 공유(`Sync`)할 수는 없습니다. 스레드 간 공유 가변성이 필요하면 보통 `Arc<Mutex<T>>` 또는 읽기 위주라면 `Arc<RwLock<T>>`를 검토합니다. 단일 스레드에서 `Arc<Mutex<T>>`를 쓰는 건 정확하지만 과합니다. 그 자리는 `Rc<RefCell<T>>`입니다.
 
 > **C++ 감각으로는** C++의 `mutable`은 "이 멤버는 `const` 취급에서 빼달라"는 선언이고, `RefCell`은 같은 일을 하되 **대여 규칙까지 런타임에 검사**합니다. `const` 정확성 검사를 컴파일 타임에서 런타임으로 미룬 대가로, 공유 가변성을 안전하게 만들 수 있습니다.
 
 **한 줄 정리**
 - 공유 값은 기본이 불변이다. 가변이 필요하면 `Cell`/`RefCell`을 함께 쓴다.
-- `Cell`은 `Copy` 타입, `RefCell`은 나머지 전부.
+- `Cell<T>`는 모든 타입을 감쌀 수 있고, `get()`은 `T: Copy`일 때 사용할 수 있다. `RefCell<T>`은 런타임 대여 검사를 제공한다.
 - `RefCell`의 검사는 런타임이고, 위반하면 panic이다.
 - 단일 스레드의 공유 가변은 `Rc<RefCell<T>>`.
 
@@ -1489,7 +1517,7 @@ fn get(v: &[i32], n: usize) -> Option<i32> {
 
 > **팁** `Option<Box<T>>`나 `Option<&T>`는 포인터 크기 그대로입니다. `None`이 null 포인터로 표현되도록 컴파일러가 최적화하기 때문입니다. "Option을 쓰면 메모리가 늘어난다"는 걱정은 대부분 사실이 아닙니다.
 
-> **C++ 감각으로는** `std::optional`과 문법은 비슷하지만 결정적으로 다릅니다. C++은 "null일 수 있는 참조"가 여전히 존재해서 검사를 잊을 수 있고, Rust는 그런 참조 자체가 없습니다. 검사를 잊는 것이 불가능한 `optional`이라고 보면 됩니다. 또한 C++23에서는 `std::optional`에도 `.and_then()`, `.transform()`, `.or_else()` 같은 모나딕 연산이 추가되어, Rust `Option`의 `.and_then()`, `.map()`, `.or_else()`와 같은 방식으로 값을 꺼내지 않고 연쇄 변환할 수 있습니다.
+> **C++ 감각으로는** `std::optional`과 문법은 비슷하지만 결정적으로 다릅니다. Rust의 일반 참조(`&T`, `&mut T`)는 null이 될 수 없습니다. 값의 부재는 `Option<&T>`처럼 타입으로 표현합니다. C++의 포인터나 `optional<reference_wrapper<T>>`와 비교하는 편이 더 정확합니다. 검사를 잊는 것이 불가능한 `optional`이라고 보면 됩니다. 또한 C++23에서는 `std::optional`에도 `.and_then()`, `.transform()`, `.or_else()` 같은 모나딕 연산이 추가되어, Rust `Option`의 `.and_then()`, `.map()`, `.or_else()`와 같은 방식으로 값을 꺼내지 않고 연쇄 변환할 수 있습니다.
 
 **한 줄 정리**
 - `enum`은 variant마다 다른 데이터를 담는 상자다. `std::variant`의 상위 호환.
@@ -2023,8 +2051,8 @@ fn main() {
 | 트레이트 | 역할 | C++ 대응 |
 | :--- | :--- | :--- |
 | `Default` | 기본값 생성 `default()` | `T() = default` |
-| `Clone` | 명시적 깊은 복사 `.clone()` | 복사 생성자 |
-| `Copy` | 비트 단위 암묵적 복사 | POD / trivially copyable |
+| `Clone` | 명시적 복제 `.clone()` | 복사 생성자와 유사하나 깊은 복사를 보장하지는 않음 |
+| `Copy` | 암묵적 복사 가능한 값 의미론 | 단순 값 타입과 비슷하지만 C++의 POD 또는 `trivially copyable`과 동일한 개념은 아님 |
 | `Drop` | 스코프 종료 시 해제 | 소멸자 `~T()` |
 | `Debug` | 개발자용 출력 `{:?}` | 디버그 프린터 |
 | `Display` | 사용자용 출력 `{}` | `operator<<` |
@@ -2239,7 +2267,7 @@ fn main() {
 
 ### 9.7. `From`과 `Into`: 값 변환 (C++: 변환 생성자 · `operator T()`)
 
-C++의 변환 생성자에 대응합니다. `From<T>`를 구현하면 반대 방향 `Into<U>`가 자동으로 생깁니다. 그래서 보통 `From`만 구현하면 됩니다.
+C++의 변환 생성자에 대응합니다. `From<T> for U`를 구현하면 표준 라이브러리의 blanket implementation을 통해 `Into<U> for T`가 자동으로 제공됩니다. `From`은 실패하지 않는 변환을 표현하지만, 의미상 무손실 여부는 도메인 설계자가 보장해야 합니다. 그래서 보통 `From`만 구현하면 됩니다.
 
 ```cpp
 // C++: 변환 생성자
@@ -2284,11 +2312,11 @@ fn main() {
 * **`Send`**: 소유권을 다른 스레드로 넘겨도 안전합니다. `Rc`는 단일 스레드 전용이라 `Send`가 아닙니다.
 * **`Sync`**: 여러 스레드가 동시에 `&T`로 접근해도 안전합니다. `T`가 `Sync`면 `&T`는 `Send`입니다.
 
-`Arc<T>`를 스레드에 넘기려면 `T: Send + Sync`여야 하고, 이 조건이 맞지 않으면 컴파일러가 거부합니다. 5.3절에서 본 데이터 경합 차단이 스레드 경계까지 확장된 것입니다.
+`Arc<T>` 자체가 내부 값을 자동으로 스레드 안전하게 만드는 것은 아닙니다. `Arc<T>`를 스레드 간 공유 가능한 형태로 사용하려면 일반적으로 `T: Send + Sync`가 필요합니다. `Arc<Mutex<T>>`처럼 동기화 타입으로 감싸면 그 타입의 안전성 계약에 따라 공유 가변성을 구현할 수 있습니다. 5.3절에서 본 데이터 경합 차단이 스레드 경계까지 확장된 것입니다.
 
 **한 줄 정리**
 - `#[derive(...)]`로 대부분의 표준 트레이트를 공짜로 얻는다.
-- 기본은 이동, 복사가 필요하면 `Copy`(비트) 또는 `Clone`(명시적 깊은 복사).
+- 기본은 이동. 암묵 복사가 적절한 타입은 `Copy`, 명시적 복제가 필요한 타입은 `Clone`을 사용합니다. `Clone`이 반드시 깊은 복사인 것은 아닙니다.
 - `From`을 구현하면 `Into`가 따라온다. `Drop`은 소멸자, `Send`/`Sync`는 스레드 안전 증명.
 
 ---
@@ -2313,7 +2341,7 @@ src/
     └── http.rs        # network::http 모듈 본문
 ```
 
-Rust 2015에서는 `src/network/mod.rs`를 썼지만, 2018 에디션부터는 `src/network.rs` + `src/network/http.rs` 조합이 권장됩니다. 파일명이 겹치지 않아서 찾기 쉽기 때문입니다.
+모듈 파일은 `src/network.rs` + `src/network/http.rs` 형태 또는 `src/network/mod.rs` 형태를 사용할 수 있습니다. `mod.rs` 방식도 현재 유효하며, 어느 쪽을 택할지는 프로젝트의 일관성과 모듈 구조에 맞추면 됩니다. 파일명이 겹치지 않아서 찾기 쉽기 때문입니다.
 
 중요한 차이가 하나 있습니다. C++은 각 소스 파일이 필요한 헤더를 `#include`합니다. Rust는 **루트(`main.rs` 또는 `lib.rs`)에서 `mod`로 한 번만 선언**하면, 프로젝트 어디서든 경로로 참조할 수 있습니다.
 
@@ -2502,13 +2530,13 @@ C++에서 `throw`는 함수의 정상 흐름을 끊고 스택을 되감습니다
 | :--- | :--- | :--- |
 | 전달 방식 | `throw`로 제어 흐름 점프 | `Ok(T)` / `Err(E)` 반환값 |
 | 시그니처 | 함수 선언으로 예외 여부를 알기 어려움 | 반환 타입에 에러 타입이 명시됨 |
-| 처리 강제 | `catch` 누락 시 `std::terminate` | `#[must_use]` + `match` 완전성 검사 |
-| 런타임 비용 | 스택 되감기 비용 | 제로 오버헤드(그냥 enum) |
-| 복구 불가 | `std::abort()` | `panic!` (기본은 스레드 unwind 후 종료, `panic = "abort"`면 프로세스 종료) |
+| 미처리 방지 | 호출 스택 최상위까지 예외가 처리되지 않으면 `std::terminate` | `#[must_use]` 경고. `match`, `?` 등으로 처리 |
+| 런타임 비용 | 예외 경로에서 스택 되감기 등 | 일반적으로 값 기반 분기. 최적화와 에러 타입에 따라 비용은 달라짐 |
+| 복구 불가 | `std::terminate()` / `std::abort()` | `panic!` (기본 unwind는 해당 스레드를 unwind하며, main 스레드의 미처리 panic은 프로세스를 종료시킴. `panic = "abort"`는 즉시 abort) |
 
 ### 11.1. `try`/`catch` 대신 `Result` + `match` (C++: 예외 · `std::error_code`)
 
-`match`는 C++ `switch`와 닮았지만 결정적인 차이가 있습니다. **모든 경우를 처리했는지 컴파일러가 검사합니다.** `Ok`와 `Err` 중 하나를 빼먹으면 컴파일이 안 됩니다.
+`match`는 C++ `switch`와 닮았지만 결정적인 차이가 있습니다. **모든 경우를 처리했는지 컴파일러가 검사합니다.** `Ok`와 `Err` 중 하나를 빼먹으면 컴파일이 안 됩니다. 다만 `Result`를 반드시 `match`로 처리해야 하는 것은 아닙니다. `?`, `map`, `unwrap_or` 등을 사용할 수 있고, 값을 의도적으로 버릴 수도 있습니다(이 경우 `must_use` 경고를 확인해야 합니다).
 
 ```cpp
 // C++: throw + try/catch
@@ -2674,3 +2702,368 @@ Rust에서 가장 중요한 태도는 **컴파일러와 싸우지 않기**입니
 | 모나딕 체이닝 | `.and_then()`, `.map()` (`Option`/`Result`) | `.and_then()`, `.transform()` (`optional`/`expected`) | C++23 |
 | 명시적 수신자 | `fn foo(&mut self)` | `void foo(this Self& self)` | C++23 |
 | 포맷 출력 | `println!("{}", x)` | `std::println("{}", x)` | C++23 |
+
+---
+
+## 13. 테스트와 품질 도구 (C++: CTest · GoogleTest · 정적 분석)
+
+**핵심: Rust는 테스트를 언어와 Cargo 워크플로에 기본 통합합니다.**
+
+C++에서 GoogleTest와 CTest를 조합하듯 Rust에서는 `#[test]`, `cargo test`, `clippy`, `rustfmt`를 기본 도구로 사용합니다.
+
+### 13.1. 단위 테스트와 통합 테스트
+
+- **단위 테스트**: 보통 테스트 대상 모듈 안의 `#[cfg(test)] mod tests`에 둡니다. private 항목도 테스트할 수 있습니다.
+- **통합 테스트**: `tests/` 디렉터리에 별도 파일로 둡니다. 외부에서 사용하는 것처럼 공개 API를 검증합니다.
+- **문서 테스트**: 문서 주석의 코드 블록을 실제 테스트로 실행합니다.
+
+```rust
+// src/lib.rs
+pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adds_two_numbers() {
+        assert_eq!(add(2, 3), 5);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid")]
+    fn demonstrates_expected_panic() {
+        panic!("invalid input");
+    }
+}
+```
+
+```bash
+cargo test
+cargo test adds_two_numbers
+cargo test --doc
+```
+
+### 13.2. 통합 테스트
+
+```text
+my_project/
+├── Cargo.toml
+├── src/
+│   └── lib.rs
+└── tests/
+    └── api_test.rs
+```
+
+```rust
+// tests/api_test.rs
+use my_project::add;
+
+#[test]
+fn public_api_adds() {
+    assert_eq!(add(10, 20), 30);
+}
+```
+
+통합 테스트는 라이브러리의 공개 API만 사용할 수 있습니다. 따라서 외부 사용자의 관점에서 API가 올바른지 확인하기 좋습니다.
+
+### 13.3. 개발 기본 도구
+
+| 명령 | 역할 | C++에서 가까운 도구 |
+|---|---|---|
+| `cargo fmt` | 코드 포맷팅 | clang-format |
+| `cargo clippy` | 린트와 관용구 진단 | clang-tidy 일부 |
+| `cargo test` | 테스트 실행 | CTest / GoogleTest |
+| `cargo doc --open` | 문서 생성 및 열기 | Doxygen 일부 |
+| `cargo check` | 빠른 컴파일 검사 | IDE 진단 / 구문·타입 검사 |
+| `cargo audit` | 의존성 취약점 점검(별도 설치) | 의존성 보안 스캐너 |
+
+CI에서는 다음과 같은 순서를 기본으로 둘 수 있습니다.
+
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all
+cargo build --release
+```
+
+프로젝트에 따라 모든 feature 조합을 동시에 빌드하는 것이 불가능할 수 있으므로 CI 매트릭스를 별도로 설계해야 합니다.
+
+---
+
+## 14. 동시성 프로그래밍 (C++: `std::thread` · `mutex` · atomic)
+
+**핵심: Rust는 스레드 간 이동과 공유 가능성을 `Send`와 `Sync`로 표현하고, 동기화 방식은 타입으로 드러냅니다.**
+
+### 14.1. 스레드 생성과 소유권 이동
+
+```cpp
+// C++: thread에 값을 전달
+std::thread t([value = 42] {
+    std::cout << value << "\n";
+});
+t.join();
+```
+
+```rust
+use std::thread;
+
+fn main() {
+    let value = 42;
+
+    let handle = thread::spawn(move || {
+        println!("{value}");
+    });
+
+    handle.join().expect("thread panicked");
+}
+```
+
+`move` 클로저는 캡처한 값을 클로저 안으로 이동시킵니다. 스레드는 호출한 함수보다 오래 실행될 수 있으므로, `thread::spawn`은 스레드가 소유할 수 있는 `'static` 수명 조건을 요구합니다. 여기서 `'static`은 값이 반드시 전역 변수라는 뜻이 아니라, 빌린 데이터가 스레드보다 먼저 사라지지 않아야 한다는 타입 제약입니다.
+
+### 14.2. 공유 가변성: `Arc<Mutex<T>>`
+
+```rust
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = Vec::new();
+
+    for _ in 0..4 {
+        let counter = Arc::clone(&counter);
+
+        handles.push(thread::spawn(move || {
+            let mut value = counter.lock().expect("mutex poisoned");
+            *value += 1;
+        }));
+    }
+
+    for handle in handles {
+        handle.join().expect("thread panicked");
+    }
+
+    println!("{}", *counter.lock().unwrap());
+}
+```
+
+- `Arc<T>`: 여러 소유자가 원자적 참조 카운트로 하나의 값을 공유합니다.
+- `Mutex<T>`: 한 번에 하나의 스레드만 내부 값에 접근하도록 잠급니다.
+- `lock()`은 guard를 반환합니다. guard가 살아 있는 동안 잠금이 유지되고, guard가 drop되면 잠금이 해제됩니다.
+
+`Arc`만 사용한다고 내부 데이터의 동시 수정이 안전해지는 것은 아닙니다. 내부 가변성이 필요하면 `Mutex`, `RwLock`, atomic 타입 등 적절한 동기화 도구를 함께 사용해야 합니다.
+
+### 14.3. 채널을 이용한 메시지 전달
+
+공유 메모리를 직접 수정하는 대신 메시지를 보내는 방식도 있습니다.
+
+```rust
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        tx.send(String::from("hello")).unwrap();
+    });
+
+    let message = rx.recv().unwrap();
+    println!("{message}");
+}
+```
+
+`mpsc`는 multiple producer, single consumer 채널입니다. 메시지 전달은 데이터 소유권을 함께 이동시키는 구조를 만들기 쉬워 공유 가변성을 줄이는 데 유용합니다.
+
+### 14.4. C++과의 비교에서 기억할 점
+
+| C++ | Rust | 차이 |
+|---|---|---|
+| `std::thread` | `std::thread::spawn` | 스레드 핸들 개념은 유사 |
+| `std::mutex` | `Mutex<T>` | 잠금 guard의 RAII 해제 |
+| `std::shared_ptr<T>` | `Arc<T>` | 원자적 참조 카운트 |
+| `std::atomic<T>` | `Atomic*` 타입 | 원자적 메모리 연산 |
+| 큐/메시지 라이브러리 | `mpsc` 등 | 소유권 이동과 결합 |
+
+---
+
+## 15. 비동기 프로그래밍 (C++: `std::future` · coroutine)
+
+**핵심: Rust의 `async` 함수는 Future를 반환하며, 실제 실행과 스케줄링은 executor가 담당합니다.**
+
+Rust 표준 라이브러리는 Future 트레이트와 async/await 문법을 제공하지만, 범용 비동기 런타임을 기본 제공하지는 않습니다. 네트워크 서버나 타이머 등을 만들려면 Tokio, async-std 등의 런타임을 선택하는 경우가 많습니다.
+
+### 15.1. `async`와 `await`
+
+```rust
+async fn fetch_value() -> u32 {
+    42
+}
+```
+
+이 함수는 호출 즉시 `u32`를 반환하는 것이 아니라, 나중에 완료될 작업을 나타내는 `Future<Output = u32>`를 반환합니다.
+
+```rust
+// Tokio 예시: Cargo.toml에 tokio 의존성이 필요
+#[tokio::main]
+async fn main() {
+    let value = fetch_value().await;
+    println!("{value}");
+}
+```
+
+### 15.2. C++ coroutine과의 차이
+
+| 항목 | C++20 coroutine | Rust async |
+|---|---|---|
+| 지연 실행 | coroutine handle 및 호출 방식에 따라 다름 | Future는 poll되기 전까지 실행되지 않음 |
+| 스케줄링 | 표준 언어 기능만으로 executor 제공 안 함 | 표준 Future만으로 executor 제공 안 함 |
+| 대기 문법 | `co_await` | `.await` |
+| 작업 표현 | promise/awaiter 프로토콜 | `Future` 트레이트 |
+| 런타임 | 별도 구현 필요 | Tokio 등 선택 |
+
+### 15.3. 실무에서 주의할 점
+
+- `.await`는 스레드를 무조건 새로 만드는 기능이 아닙니다.
+- CPU 집약 작업을 async 함수 안에서 오래 실행하면 executor의 다른 작업을 막을 수 있습니다.
+- `std::thread::spawn`과 async task는 실행 모델이 다릅니다.
+- 비동기 함수가 참조를 보유하면 Future의 수명과 `Send` 요구 조건에 영향을 줄 수 있습니다.
+- 런타임별 API와 기능이 다르므로 프로젝트 초기에 런타임을 선택하는 것이 좋습니다.
+
+---
+
+## 16. C/C++ 연동과 `unsafe` (C ABI · 포인터 · FFI)
+
+**핵심: Rust는 C ABI를 통해 기존 C/C++ 시스템과 연결할 수 있지만, FFI 경계는 안전성 계약을 직접 관리해야 합니다.**
+
+### 16.1. C ABI로 함수 내보내기
+
+```rust
+// Rust 라이브러리
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_add(a: i32, b: i32) -> i32 {
+    a + b
+}
+```
+
+`extern "C"`는 C ABI 호출 규약을 사용한다는 뜻입니다. `no_mangle`은 심볼 이름을 지정한 이름으로 내보내기 위한 속성입니다. Rust 2024 Edition에서는 일부 unsafe 속성을 `#[unsafe(...)]` 형태로 명시합니다.
+
+C/C++에서는 헤더 선언을 통해 호출할 수 있습니다.
+
+```cpp
+extern "C" int rust_add(int a, int b);
+
+int main() {
+    return rust_add(10, 20);
+}
+```
+
+실제 프로젝트에서는 `Cargo.toml`의 `crate-type`을 `staticlib`, `cdylib` 등으로 설정하고 플랫폼별 링크 설정을 해야 합니다.
+
+### 16.2. `unsafe`가 의미하는 것
+
+`unsafe`는 "이 코드는 안전하다"는 인증이 아닙니다. 컴파일러가 자동으로 검증할 수 없는 일부 작업을 개발자가 책임지고 수행하겠다는 경계입니다.
+
+대표적인 작업은 다음과 같습니다.
+
+- raw pointer 역참조
+- `unsafe` 함수 호출
+- `unsafe` trait 구현
+- union 필드 접근
+- 외부 메모리 및 ABI 계약 처리
+
+```rust
+fn main() {
+    let value = 10;
+    let ptr: *const i32 = &value;
+
+    // 포인터가 유효하고 정렬되어 있으며 수명이 유지된다는 전제가 필요
+    let copied = unsafe { *ptr };
+    println!("{copied}");
+}
+```
+
+`unsafe` 블록 안에 있다고 해서 모든 검증이 사라지는 것은 아닙니다. 컴파일러는 여전히 일반적인 타입 검사 등을 수행하지만, 포인터 유효성이나 aliasing 같은 일부 불변식은 작성자가 보장해야 합니다.
+
+### 16.3. FFI 경계 설계 원칙
+
+1. C ABI에서 표현 가능한 타입을 우선 사용합니다.
+2. Rust의 `String`, `Vec<T>`, trait object를 C 구조체처럼 직접 노출하지 않습니다.
+3. 메모리를 할당한 쪽과 해제하는 쪽을 명확히 정합니다.
+4. 포인터와 길이를 함께 전달하고, null 및 길이 검증을 수행합니다.
+5. Rust panic이 C ABI 경계를 넘어 전파되지 않도록 설계합니다.
+6. C++ 객체를 직접 ABI로 노출하기보다 C 인터페이스 래퍼를 두는 방식을 우선 검토합니다.
+
+C++은 C ABI와 동일한 ABI를 보장하지 않습니다. C++과 Rust의 직접 연동은 별도 ABI 솔루션(cxx 등)을 검토하거나 C 호환 래퍼를 경계로 두는 편이 일반적으로 안전합니다.
+
+---
+
+## 17. 실무 학습 로드맵 (C++ 개발자의 전환 순서)
+
+기존 C++ 경험을 활용하되, 문법보다 소유권과 API 설계를 먼저 익히는 편이 효율적입니다.
+
+### 17.1. 학습 순서
+
+| 단계 | 학습 주제 | 확인할 내용 |
+|---|---|---|
+| 1 | Cargo와 기본 문법 | 프로젝트 생성, 모듈, 타입 추론 |
+| 2 | 소유권과 대여 | move, borrow, mutable borrow |
+| 3 | 수명과 참조 설계 | 함수 인자·반환값·구조체의 lifetime |
+| 4 | enum과 패턴 매칭 | `Option`, `Result`, `match` |
+| 5 | 제네릭과 트레이트 | trait bounds, `impl Trait`, `dyn Trait` |
+| 6 | 컬렉션과 이터레이터 | `Vec`, `HashMap`, iterator adapter |
+| 7 | 에러와 테스트 | `Result`, `?`, 단위·통합 테스트 |
+| 8 | 동시성과 비동기 | `Arc`, `Mutex`, channel, Future |
+| 9 | FFI와 unsafe | C ABI, raw pointer, 안전성 계약 |
+
+### 17.2. C++ 개발자가 특히 바꿔야 할 습관
+
+- `T*`를 먼저 떠올리기보다 값 소유자와 참조 관계를 먼저 설계합니다.
+- `shared_ptr`를 기본 선택으로 두지 말고, 소유권을 단순화할 수 있는지 먼저 검토합니다.
+- 컴파일 에러를 `clone()`으로 무조건 해결하지 않습니다. 복사 비용과 소유권 모델을 먼저 확인합니다.
+- 클래스 상속 계층을 그대로 옮기기보다 `struct`와 trait 조합으로 모델링합니다.
+- 예외를 던지는 설계 대신 `Result`로 실패 가능성을 API에 표현합니다.
+- `unsafe`는 편의를 위한 우회로가 아니라 명확한 불변식을 구현하는 좁은 경계로 제한합니다.
+
+### 17.3. 첫 번째 연습 프로젝트
+
+작은 CLI 프로그램을 권장합니다.
+
+- 입력: JSON 또는 CSV 파일
+- 처리: 구조체, enum, iterator, 에러 전파
+- 출력: 집계 결과와 파일 저장
+- 품질: 단위 테스트, 통합 테스트, Clippy
+- 확장: 병렬 처리 또는 비동기 네트워크 호출
+
+이 정도 프로젝트를 소유권을 무리하게 복제하지 않고 구현할 수 있다면, Rust의 기본 설계 감각을 갖추기 시작한 것입니다.
+
+---
+
+## 부록 A. 기존 내용에서 바로잡은 핵심 개념
+
+| 항목 | 정확한 이해 |
+|---|---|
+| `From` | 실패하지 않는 변환 계약. 모든 경우에 수학적 무손실을 뜻하지 않음 |
+| `Cell<T>` | 모든 타입을 감쌀 수 있음. `get()`은 `T: Copy`일 때 가능 |
+| `RefCell<T>` | `T: Send`이면 이동 가능할 수 있지만 `Sync`는 아님 |
+| `Arc<T>` | 참조 카운트의 스레드 안전성과 내부 데이터의 스레드 안전성은 별개 |
+| `Result<T, E>` | `#[must_use]` 경고 대상. `match` 외에도 `?`, `map`, `unwrap_or` 등으로 처리 |
+| `Copy` | C++의 POD나 trivially copyable과 동일하지 않음 |
+| `Clone` | 명시적 복제지만 깊은 복사를 보장하지 않음 |
+| 정수 오버플로 | 프로파일 설정에 따라 검사 또는 래핑. 프로젝트 설정 확인 필요 |
+| `&[T]` | 일반적으로 주소와 길이를 담지만 구체적 ABI 표현에 의존하지 말 것 |
+| `cargo check` | 최종 링크는 하지 않지만 build script/proc macro/의존성 빌드가 수행될 수 있음 |
+
+## 부록 B. 참고할 공식 문서
+
+- The Rust Programming Language: https://doc.rust-lang.org/book/
+- Rust Reference: https://doc.rust-lang.org/reference/
+- The Rust Edition Guide: https://doc.rust-lang.org/edition-guide/
+- The Rust Standard Library: https://doc.rust-lang.org/std/
+- The Cargo Book: https://doc.rust-lang.org/cargo/
+- The Rustonomicon (`unsafe`와 메모리 모델): https://doc.rust-lang.org/nomicon/
+- The Rust API Guidelines: https://rust-lang.github.io/api-guidelines/
+
