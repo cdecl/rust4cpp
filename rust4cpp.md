@@ -497,6 +497,8 @@ fn main() {
 }
 ```
 
+> **C++ 감각으로는** C++20에서는 `std::format`으로 문자열을 만든 뒤 `std::cout`에 넘겨야 했지만, C++23부터는 `<print>` 헤더의 `std::println("{}", x)`가 도입되어 Rust의 `println!("{}", x)`와 거의 같은 문법으로 바로 출력할 수 있습니다.
+
 > **팁** 구조체를 `{:?}`로 찍고 싶으면 `#[derive(Debug)]` 한 줄만 붙이면 됩니다. C++에서 `operator<<`를 직접 쓰던 수고가 사라집니다.
 
 ### 4.4. 타입 변환 (C++: `static_cast` 계열)
@@ -1349,6 +1351,8 @@ fn main() {
 * **`self`가 명시적이다.** `area(&self)`는 "이 객체를 빌려서 읽기만 한다", `scale(&mut self)`는 "빌려서 고친다"는 뜻입니다. C++의 `const` 한정자와 `mutable` 논쟁이 문법으로 정리된 셈입니다.
 * **필드 접근 제어는 모듈 단위다.** `private:` 키워드가 없고, `pub`을 안 붙이면 그 모듈 밖에서 보이지 않습니다. 구조체 필드 하나하나에도 `pub`을 붙일 수 있습니다.
 
+> **C++ 감각으로는** C++23에서 도입된 명시적 객체 매개변수(`void foo(this Self& self)` / `double area(this const Rectangle& self)`)가 바로 이 방식입니다. Rust는 처음부터 모든 메서드에 `&self`, `&mut self`처럼 수신자를 명시적으로 적습니다.
+
 > **팁** `impl` 블록은 여러 개로 나눠도 됩니다. 그래서 `impl Display`, `impl Default`처럼 트레이트별로 블록을 따로 두는 게 관례입니다. 9장에서 계속 나옵니다.
 
 **한 줄 정리**
@@ -1485,7 +1489,7 @@ fn get(v: &[i32], n: usize) -> Option<i32> {
 
 > **팁** `Option<Box<T>>`나 `Option<&T>`는 포인터 크기 그대로입니다. `None`이 null 포인터로 표현되도록 컴파일러가 최적화하기 때문입니다. "Option을 쓰면 메모리가 늘어난다"는 걱정은 대부분 사실이 아닙니다.
 
-> **C++ 감각으로는** `std::optional`과 문법은 비슷하지만 결정적으로 다릅니다. C++은 "null일 수 있는 참조"가 여전히 존재해서 검사를 잊을 수 있고, Rust는 그런 참조 자체가 없습니다. 검사를 잊는 것이 불가능한 `optional`이라고 보면 됩니다.
+> **C++ 감각으로는** `std::optional`과 문법은 비슷하지만 결정적으로 다릅니다. C++은 "null일 수 있는 참조"가 여전히 존재해서 검사를 잊을 수 있고, Rust는 그런 참조 자체가 없습니다. 검사를 잊는 것이 불가능한 `optional`이라고 보면 됩니다. 또한 C++23에서는 `std::optional`에도 `.and_then()`, `.transform()`, `.or_else()` 같은 모나딕 연산이 추가되어, Rust `Option`의 `.and_then()`, `.map()`, `.or_else()`와 같은 방식으로 값을 꺼내지 않고 연쇄 변환할 수 있습니다.
 
 **한 줄 정리**
 - `enum`은 variant마다 다른 데이터를 담는 상자다. `std::variant`의 상위 호환.
@@ -1759,7 +1763,7 @@ fn main() {
 * **`<T>`**: 호출할 때 정해지는 임의의 타입을 받겠다는 선언. 타입이 들어갈 빈칸입니다.
 * **`: Drawable`**: 그 빈칸에 들어올 자격 조건(트레이트 바운드). `Drawable`을 구현한 타입만 올 수 있습니다.
 
-C++ 템플릿은 바운드 없이도 본문에서 `item.draw()`를 써두고, 실제 인스턴스화될 때 오류를 냅니다(덕 타이핑). Rust는 바운드가 없으면 `T`에 `.draw()`가 있는지 알 수 없으므로 **제네릭 정의 단계에서 바로 에러**를 냅니다. C++20 `concepts`의 `template <Drawable T>`와 같은 역할입니다.
+C++ 템플릿은 바운드 없이도 본문에서 `item.draw()`를 써두고, 실제 인스턴스화될 때 오류를 냅니다(덕 타이핑). Rust는 바운드가 없으면 `T`에 `.draw()`가 있는지 알 수 없으므로 **제네릭 정의 단계에서 바로 에러**를 냅니다. C++20 `concepts`의 `template <typename T> requires DrawableConcept<T>`(또는 축약형 `template <DrawableConcept T>`)와 같은 역할입니다.
 
 ```cpp
 // C++20: concepts와 타입 별칭
@@ -1768,7 +1772,7 @@ C++ 템플릿은 바운드 없이도 본문에서 `item.draw()`를 써두고, �
 template <typename T>
 concept DrawableConcept = requires(const T& t) { t.draw(); };
 
-template <DrawableConcept T>
+template <typename T> requires DrawableConcept<T>
 void render_static(const T& item) { item.draw(); }
 
 using Meter = double;   // 타입 별칭
@@ -1783,7 +1787,7 @@ fn render_static_short(item: &impl Drawable) {
 type Meter = f64;   // 진짜 타입 별칭
 ```
 
-`impl Trait`은 매번 `<T: Drawable>`을 쓰기 귀찮을 때 쓰는 단축입니다. `type Meter = f64;`는 C++ `using Meter = double;`과 같은 타입 별칭이고, 제네릭 파라미터와는 다른 개념입니다.
+`impl Trait`은 매번 `<T: Drawable>`을 쓰기 귀찮을 때 쓰는 단축입니다. C++20의 축약 함수 템플릿(Abbreviated Function Template)인 `void render_static_short(const DrawableConcept auto& item)`과 정확히 같은 역할입니다. `type Meter = f64;`는 C++ `using Meter = double;`과 같은 타입 별칭이고, 제네릭 파라미터와는 다른 개념입니다.
 
 **한 줄 정리**
 - 상속 대신 트레이트. "무엇을 할 수 있는가"만 정의한다.
@@ -1924,10 +1928,10 @@ fn main() {
 | `collect` | 모아서 컬렉션 생성 | 수동 `push_back` |
 | `fold` | 누적 계산 | `accumulate` |
 | `sum` / `count` / `max` | 집계 | `accumulate` 응용 |
-| `enumerate` | 인덱스 붙이기 | 수동 카운터 |
-| `zip` | 두 시퀀스 묶기 | `views::zip` |
-| `take` / `skip` | 앞에서 자르기 / 건너뛰기 | `views::take` |
-| `chain` | 이어 붙이기 | `views::concat` |
+| `enumerate` | 인덱스 붙이기 | `views::enumerate` (C++23) |
+| `zip` | 두 시퀀스 묶기 | `views::zip` (C++23) |
+| `take` / `skip` | 앞에서 자르기 / 건너뛰기 | `views::take` / `views::drop` |
+| `chain` | 이어 붙이기 | `views::concat` (C++26 예정) |
 | `rev` | 역순 | `views::reverse` |
 | `position` / `find` | 찾기 | `std::find` |
 
@@ -1973,7 +1977,7 @@ for x in v { }           // into_iter(): i32, 원본 소비(이동)
 
 > **팁** `collect`는 실패를 전파하는 데도 씁니다. `Result`의 이터레이터에서 `collect::<Result<Vec<_>, _>>()`를 하면, 하나라도 `Err`일 때 전체가 `Err`가 됩니다. 11장의 `?` 연산자와 같은 발상입니다.
 
-> **C++ 감각으로는** C++20의 ranges와 같지만, Rust에서는 1.0부터 표준이었고 컴파일러가 체인 전체를 한 루프로 합칩니다. `for (int i = 0; i < n; ++i)` 습관은 `for (i, x) in v.iter().enumerate()`로 옮기면 대부분 그대로 읽힙니다.
+> **C++ 감각으로는** C++20의 ranges 파이프라인(`std::views::filter | std::views::transform`)과 같지만, Rust의 `.iter().filter().map()` 체인은 1.0부터 표준이었고 컴파일러가 체인 전체를 한 루프로 합칩니다. 또한 4.5절에서 본 `.chunks()`와 `.windows()`는 C++23의 `std::views::chunk`, `std::views::slide`에 대응합니다. `for (int i = 0; i < n; ++i)` 습관은 `for (i, x) in v.iter().enumerate()`로 옮기면 대부분 그대로 읽힙니다.
 
 **한 줄 정리**
 - `for`는 이터레이터 순회다. 인덱스 루프가 아니다.
@@ -1991,9 +1995,9 @@ for x in v { }           // into_iter(): i32, 원본 소비(이동)
 
 C++은 컴파일러가 특수 멤버 함수를 자동 생성합니다. 기본 생성자, 복사 생성자, 이동 생성자, 대입 연산자, 소멸자. `= default`로 명시하기도 하고, 안 쓰면 암묵적으로 생깁니다. Rust는 같은 일을 전부 트레이트로 이름 붙여 노출합니다. 그래서 "이 타입은 복사가 되는가", "이 타입은 출력이 되는가"를 타입 선언만 보고 알 수 있습니다.
 
-### 9.1. `#[derive(...)]` (C++: 컴파일러 생성 복사 · `operator==`)
+### 9.1. `#[derive(...)]` (C++: 컴파일러 생성 복사 · `operator==` · `operator<=>`)
 
-C++20의 `= default`처럼, Rust는 `#[derive(...)]`로 표준 트레이트 구현을 자동 생성합니다.
+C++20에서 `bool operator==(const Point&) const = default;`나 삼중 비교 연산자(`auto operator<=>(const Point&) const = default;`) 한 줄로 비교 연산자를 자동 생성하는 것처럼, Rust는 `#[derive(...)]`로 표준 트레이트 구현(`PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Clone`, `Debug` 등)을 자동 생성합니다.
 
 ```rust
 // Eq, PartialEq, Debug, Clone, Copy, Default 구현이 자동 생성됨
@@ -2313,6 +2317,8 @@ Rust 2015에서는 `src/network/mod.rs`를 썼지만, 2018 에디션부터는 `s
 
 중요한 차이가 하나 있습니다. C++은 각 소스 파일이 필요한 헤더를 `#include`합니다. Rust는 **루트(`main.rs` 또는 `lib.rs`)에서 `mod`로 한 번만 선언**하면, 프로젝트 어디서든 경로로 참조할 수 있습니다.
 
+> **C++ 감각으로는** C++20에서 `#include` 텍스트 복붙의 한계를 넘기 위해 모듈(`export module` / `import`)을 도입하고 C++23에서 표준 라이브러리 모듈(`import std;`)을 추가한 것과 달리, Rust는 애초에 헤더 파일 없이 언어 차원의 모듈 시스템을 기본으로 설계했습니다.
+
 ### 10.2. 경로와 `use` (C++: `namespace` · `using`)
 
 * **`crate::`**: 크레이트 루트에서 시작하는 절대 경로 (C++ `::` 기준 참조)
@@ -2486,11 +2492,11 @@ fn main() {
 
 <div style="break-before: page; page-break-before: always;"></div>
 
-## 11. 에러 처리 (C++: 예외 · `std::error_code`)
+## 11. 에러 처리 (C++: 예외 · `std::error_code` · `std::expected`)
 
 **한 줄 요약: C++은 예외를 던져서 위로 보내고, Rust는 `Result`라는 반환값으로 돌려줍니다.**
 
-C++에서 `throw`는 함수의 정상 흐름을 끊고 스택을 되감습니다. 편리하지만 함수 시그니처만 봐서는 이 함수가 예외를 던지는지 알 수 없습니다. Rust에는 `try`/`catch`가 없고, 복구 가능한 에러는 전부 `Result<T, E>` 값으로 돌아옵니다. 택배 송장이라고 생각하세요. 성공이면 물건(`Ok`), 실패면 반품 사유(`Err`)가 같이 옵니다. 송장을 안 열어볼 수는 없습니다.
+C++에서 `throw`는 함수의 정상 흐름을 끊고 스택을 되감습니다. 편리하지만 함수 시그니처만 봐서는 이 함수가 예외를 던지는지 알 수 없습니다. Rust에는 `try`/`catch`가 없고, 복구 가능한 에러는 전부 `Result<T, E>` 값으로 돌아옵니다(C++23에서 도입된 `std::expected<T, E>`가 이에 해당합니다). 택배 송장이라고 생각하세요. 성공이면 물건(`Ok`), 실패면 반품 사유(`Err`)가 같이 옵니다. 송장을 안 열어볼 수는 없습니다.
 
 | 항목 | C++ 예외 | Rust `Result<T, E>` |
 | :--- | :--- | :--- |
@@ -2602,6 +2608,33 @@ fn main() {
 
 > **팁** `?`를 쓰려면 함수의 반환 타입이 `Result`(또는 `Option`)여야 합니다. `main`에서 바로 쓰고 싶으면 `fn main() -> Result<(), Box<dyn std::error::Error>>` 형태를 쓰면 됩니다.
 
+`?` 외에도 `Result<T, E>`(와 `Option<T>`)는 값을 꺼내지 않고 연쇄 변환하는 **모나딕 체이닝** 메서드 `.and_then()`, `.map()`을 제공합니다. C++23의 `std::expected<T, E>`(및 `std::optional<T>`)에서도 `.and_then()`과 `.transform()`으로 같은 패턴을 쓸 수 있습니다.
+
+```cpp
+// C++23: std::expected + 모나딕 체이닝
+#include <expected>
+#include <string>
+
+std::expected<double, std::string> divide(double a, double b);
+
+std::expected<double, std::string> scaled_half(double a, double b) {
+    return divide(a, b)
+        .and_then([](double v) -> std::expected<double, std::string> {
+            return v / 2.0;
+        })
+        .transform([](double v) { return v * 10.0; });
+}
+```
+
+```rust
+// Rust: .and_then()과 .map()으로 연쇄 처리
+fn scaled_half(a: f64, b: f64) -> Result<f64, String> {
+    divide(a, b)
+        .and_then(|v| Ok(v / 2.0))
+        .map(|v| v * 10.0)
+}
+```
+
 > **주의** 정말 복구할 수 없는 상황(배열 범위 초과, `unwrap()` 실패 등)은 `panic!`입니다. C++의 `std::terminate`에 가깝습니다. 라이브러리 코드에서는 `panic!` 대신 `Result`를 반환하는 게 예의입니다.
 
 **한 줄 정리**
@@ -2623,3 +2656,21 @@ Rust에서 가장 중요한 태도는 **컴파일러와 싸우지 않기**입니
 4. **컴파일러 진단을 읽으세요.** `rustc --explain E0382` 같은 명령은 해당 에러의 원리와 예시를 문서로 보여줍니다. 에러 코드를 검색하는 습관이 초반 학습 속도를 크게 올립니다.
 
 처음 일주일은 느리게 느껴질 겁니다. C++에서 10분이면 쓰던 코드가 1시간 걸리기도 합니다. 그 시간은 사라지는 게 아니라, 나중에 디버거를 붙잡고 있던 시간으로 바뀌어 돌아옵니다. 소유권 규칙이 손에 붙는 순간부터는 오히려 "이 코드는 왜 이렇게 짰지"를 컴파일러가 먼저 물어봐 주는 느낌이 듭니다. 그때부터 Rust가 편해집니다.
+
+### 모던 C++(C++17/20/23)과 Rust 주요 대응 한눈에 보기
+
+| 개념 / 기능 | Rust 표현식 | 모던 C++ 대응 기능 | 도입 표준 |
+| :--- | :--- | :--- | :--- |
+| 문자열 뷰 (대여) | `&str` | `std::string_view` | C++17 |
+| 합타입 (태그된 공용체) | `enum` + `match` | `std::variant` + `std::visit` | C++17 |
+| 널 대체 (값의 유무) | `Option<T>` | `std::optional<T>` | C++17 |
+| 구조 분해 | `let (a, b) = pair;` | `auto [a, b] = pair;` | C++17 |
+| 인터페이스 제약 | `T: Trait` / `impl Trait` | `requires Concept<T>` / `Concept auto` | C++20 |
+| 비교 연산자 자동 생성 | `#[derive(PartialEq, PartialOrd)]` | `operator<=>() = default` | C++20 |
+| 모듈 시스템 | `mod` / `use` | `export module` / `import` (`import std;`) | C++20 / 23 |
+| 컬렉션 파이프라인 | `.iter().filter().map()` | `std::views::filter \| transform` | C++20 |
+| 순회 유틸리티 | `.enumerate()`, `.zip()`, `.chunks()`, `.windows()` | `views::enumerate`, `zip`, `chunk`, `slide` | C++23 |
+| 에러 반환 타입 | `Result<T, E>` | `std::expected<T, E>` | C++23 |
+| 모나딕 체이닝 | `.and_then()`, `.map()` (`Option`/`Result`) | `.and_then()`, `.transform()` (`optional`/`expected`) | C++23 |
+| 명시적 수신자 | `fn foo(&mut self)` | `void foo(this Self& self)` | C++23 |
+| 포맷 출력 | `println!("{}", x)` | `std::println("{}", x)` | C++23 |
