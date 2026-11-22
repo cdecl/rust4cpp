@@ -34,6 +34,9 @@
 | 15 | 비동기 프로그래밍 | `std::future` · coroutine |
 | 16 | C/C++ 연동과 `unsafe` | C ABI · 포인터 · FFI |
 | 17 | 실무 학습 로드맵 | 프로젝트 전환 |
+| 부록 A | 기존 내용에서 바로잡은 핵심 개념 | 개념 교정 |
+| 부록 B | 참고할 공식 문서 | 공식 북, 레퍼런스 등 |
+| 부록 C | [🦀 핵심 문법 & 메모리 치트시트](#부록-c-🦀-rust-핵심-문법--메모리-치트시트-c--python-3자-비교) | C++ / Python 3자 비교 |
 
 **가장 중요한 장은 5장(소유권과 대여)입니다.** 다만 6장(스마트 포인터), 8장(트레이트), 11장(`Result`)까지 연결해서 읽어야 실제 설계에 적용할 수 있습니다.
 
@@ -1134,6 +1137,15 @@ C++에서 `std::unique_ptr`, `std::shared_ptr`를 쓰던 자리에 그대로 대
 | `Arc<T>` | `std::shared_ptr<T>` | 원자적 참조 카운트. 내부 데이터의 스레드 안전성은 `T`와 동기화 방식에 달림 |
 | `*const T` / `*mut T` | `const T*` / `T*` | 원시 포인터. 역참조는 `unsafe` |
 
+#### `Box<T>`의 3대 핵심 용도와 C++ 차이점
+
+`Box<T>`는 C++의 `std::unique_ptr<T>`와 대응되지만, Rust 특유의 타입 시스템과 결합하여 다음과 같은 3가지 핵심 용도로 사용됩니다:
+1. **컴파일 타임 크기 확정 (재귀 자료구조)**: 컴파일 타임에 크기를 알 수 없는 재귀적 타입(Linked List, Tree, AST 등)을 힙으로 빼서 포인터 크기(8바이트)로 고정시킵니다.
+2. **Move 비용 절감 및 스택 오버플로우 방지**: 대용량 데이터를 스택 프레임에 두지 않고 힙에 할당하여, 소유권 이동(Move) 시 거대한 데이터 복사 없이 8바이트 주소만 빠르게 복사합니다.
+3. **트레이트 객체 다형성**: `Box<dyn Trait>` 형태로 동적 디스패치(런타임 vtable 다형성)를 구현할 때 필수적인 스마트 포인터입니다.
+
+> **C++과의 결정적 차이 (Move 후 안전성)**: C++의 `std::unique_ptr`는 `std::move` 후에도 원본 변수가 `nullptr` 상태로 스코프에 남아있어, 부주의 시 런타임 댕글링/널 포인터 역참조 버그를 유발할 위험이 있습니다. 반면 Rust의 `Box<T>`는 Move가 일어나는 즉시 **컴파일러가 원본 변수에 대한 접근을 컴파일 타임에 원천 차단**합니다.
+
 `Box`는 "이사 박스에 넣어 창고에 두기"입니다. 값은 힙에 있고, 스택에는 주소만 있습니다. 재귀 구조체나 큰 값을 옮길 때 씁니다. `Rc`와 `Arc`는 "공동 소유 계약서에 이름을 여러 개 올리기"입니다. 마지막 이름이 지워질 때 값이 해제됩니다.
 
 ```cpp
@@ -1376,7 +1388,16 @@ fn main() {
 세 가지가 C++과 다릅니다.
 
 * **생성자는 없다.** `Rectangle::new(...)` 같은 연관 함수를 관례적으로 `new`라고 부를 뿐입니다. `Default`를 구현하면 `Rectangle::default()`도 쓸 수 있습니다.
-* **`self`가 명시적이다.** `area(&self)`는 "이 객체를 빌려서 읽기만 한다", `scale(&mut self)`는 "빌려서 고친다"는 뜻입니다. C++의 `const` 한정자와 `mutable` 논쟁이 문법으로 정리된 셈입니다.
+* **`self`가 명시적이며 언어 키워드다.**
+  * **지위와 위치**: 반드시 첫 번째 매개변수여야 하는 정식 예약어(Keyword)입니다. (Python의 `def func(self):`와 역할이 같지만, Python은 관례일 뿐이고 Rust는 언어 키워드로 강제합니다.)
+  * **타입 생략 (문법 설탕)**: `impl` 블록 안에서 첫 번째 인자가 `self`일 때만 타입을 생략할 수 있습니다.
+    * `self` ➔ `self: Self` (값으로 소유권을 완전히 가져와 소비/파괴하는 메서드)
+    * `&self` ➔ `self: &Self` (불변 참조 빌림, C++의 `const` 멤버 함수에 해당)
+    * `&mut self` ➔ `self: &mut Self` (가변 참조 빌림, 인스턴스 값을 수정하는 메서드)
+  * **소문자 `self` vs 대문자 `Self`**:
+    * `self`: 현재 호출된 **인스턴스(값)** 자체.
+    * `Self`: 현재 구조체/트레이트의 **타입(설계도)** (예: `fn new(...) -> Self`).
+  * **자동 역참조 (Auto-dereferencing)**: C++에서는 포인터나 참조자일 때 `->`를 쓰거나 역참조 `(*self).field`를 해야 하지만, Rust는 점(`.`) 연산자가 자동으로 역참조를 수행하므로 `&mut self`에서도 `self.width`로 깔끔하게 접근합니다.
 * **필드 접근 제어는 모듈 단위다.** `private:` 키워드가 없고, `pub`을 안 붙이면 그 모듈 밖에서 보이지 않습니다. 구조체 필드 하나하나에도 `pub`을 붙일 수 있습니다.
 
 > **C++ 감각으로는** C++23에서 도입된 명시적 객체 매개변수(`void foo(this Self& self)` / `double area(this const Rectangle& self)`)가 바로 이 방식입니다. Rust는 처음부터 모든 메서드에 `&self`, `&mut self`처럼 수신자를 명시적으로 적습니다.
@@ -1720,6 +1741,18 @@ C++은 부모 클래스를 상속하고 순수 가상 함수를 오버라이드�
 * **정적 디스패치(제네릭)**: C++ 템플릿처럼 컴파일 타임에 타입별로 코드가 구체화됩니다(monomorphization). 런타임 오버헤드 0.
 * **동적 디스패치(`dyn Trait`)**: C++의 vtable + vptr과 같은 방식입니다. 런타임에 실제 타입을 찾아 호출합니다.
 
+#### 제네릭(`<T>`) 타입 추론 메커니즘과 결정 시점
+
+Rust 컴파일러는 매우 강력한 **양방향 타입 추론(Bidirectional Type Inference)**을 지원합니다:
+* **결정 시점**: 변수 선언 시점에 타입을 명시하지 않아도, 변수가 생성될 때(예: `St::new(20)`) 또는 생성 직후 **최초로 호출하는 메서드의 인자 타입**(예: `vec.push("apple")`)에 의해 `T`가 단 하나로 지연 확정됩니다.
+* **단일 정적 타입 보장**: 한 번 결정된 `T`는 해당 변수의 수명이 다할 때까지 **절대 다른 타입으로 바뀔 수 없습니다.**
+
+| 언어 | 타입 결정 시점 | 타입 변경 가능 여부 | 비고 |
+| :--- | :--- | :--- | :--- |
+| **C++ (`auto`)** | 변수 선언/초기화 시점 | 불가 (정적 타입) | 초기화 표현식의 타입으로 즉시 고정 |
+| **Rust (`<T>`)** | 선언뿐 아니라 후속 메서드 호출 문맥까지 보고 확정 | 불가 (정적 타입) | 단형성화(Monomorphization)로 런타임 오버헤드 0 |
+| **Python** | 런타임 실행 시점 | 가능 (동적 타입) | 변수에 언제든 다른 타입의 객체 대입 가능 |
+
 ```cpp
 // C++: 순수 가상 함수 + 템플릿
 #include <iostream>
@@ -2027,6 +2060,8 @@ C++은 컴파일러가 특수 멤버 함수를 자동 생성합니다. 기본 �
 
 C++20에서 `bool operator==(const Point&) const = default;`나 삼중 비교 연산자(`auto operator<=>(const Point&) const = default;`) 한 줄로 비교 연산자를 자동 생성하는 것처럼, Rust는 `#[derive(...)]`로 표준 트레이트 구현(`PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Clone`, `Debug` 등)을 자동 생성합니다.
 
+또한 속성(Attribute) 중 `#[must_use]`는 C++의 `[[nodiscard]]`와 정확히 같습니다. 반환값을 받지 않고 무시하면 컴파일 경고가 발생하며, 의도적으로 반환값을 버릴 때는 `let _ = func();` 관례를 사용합니다.
+
 ```rust
 // Eq, PartialEq, Debug, Clone, Copy, Default 구현이 자동 생성됨
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -2048,21 +2083,25 @@ fn main() {
 
 ### 9.2. 자주 쓰는 트레이트 요약 (C++: `operator<<` · `std::hash`)
 
-| 트레이트 | 역할 | C++ 대응 |
-| :--- | :--- | :--- |
-| `Default` | 기본값 생성 `default()` | `T() = default` |
-| `Clone` | 명시적 복제 `.clone()` | 복사 생성자와 유사하나 깊은 복사를 보장하지는 않음 |
-| `Copy` | 암묵적 복사 가능한 값 의미론 | 단순 값 타입과 비슷하지만 C++의 POD 또는 `trivially copyable`과 동일한 개념은 아님 |
-| `Drop` | 스코프 종료 시 해제 | 소멸자 `~T()` |
-| `Debug` | 개발자용 출력 `{:?}` | 디버그 프린터 |
-| `Display` | 사용자용 출력 `{}` | `operator<<` |
-| `Deref` / `DerefMut` | `*` 연산자, 자동 타입 강제 | `operator*`, `operator->` |
-| `From<T>` / `Into<T>` | 손실 없는 값 변환 | 변환 생성자 |
-| `Iterator` | 순회 추상화 `next()` | `std::ranges` / 반복자 |
-| `Fn` / `FnMut` / `FnOnce` | 클로저 호출 방식 분류 | `std::function` / 람다 캡처 |
-| `Send` / `Sync` | 스레드 간 이동·공유 안전성 마커 | 스레드 안전성 규약 |
+C++의 연산자 오버로딩, 소멸자, 인터페이스 상속, 특수 멤버 함수는 Rust에서 모두 **`impl [트레이트] for [타입]`** 문법 하나로 일관되게 구현됩니다 (여기서 `for`는 "~를 위하여"라는 의미입니다).
 
-`Clone`과 `Copy`가 헷갈리면 이렇게 기억하세요. `Copy`는 "값을 복사해도 아무 일도 안 일어나는 타입"(정수, `bool`, 좌표 구조체), `Clone`은 "복사에 비용이 있어서 명시적으로 불러야 하는 타입"(`String`, `Vec`)입니다.
+| 트레이트 | 핵심 구현 메서드 시그니처 | 역할 및 C++ 대응 개념 |
+| :--- | :--- | :--- |
+| `Drop` | `fn drop(&mut self)` | 스코프 종료 시 자동 해제 (소멸자 `~T()`, 직접 호출 금지, 조기 해제는 `std::mem::drop(x)`) |
+| `Default` | `fn default() -> Self` | 인자 없는 기본값 생성 (기본 생성자 `T() = default`, `{}` 초기화) |
+| `Display` | `fn fmt(&self, f: &mut Formatter) -> Result` | `println!("{}", x)` 사용자용 일반 출력 포맷 (`operator<<`) |
+| `Debug` | `fn fmt(&self, f: &mut Formatter) -> Result` | `println!("{:?}", x)` 개발자 디버그용 출력 포맷 |
+| `From<T>` | `fn from(val: T) -> Self` | 타입 변환 생성자 (구현 시 `.into()` 자동 생성) |
+| `PartialEq` | `fn eq(&self, other: &Self) -> bool` | `==`, `!=` 동등성 연산자 오버로딩 |
+| `Add<Rhs>` | `fn add(self, rhs: Rhs) -> Self::Output` | `+` 덧셈 연산자 오버로딩 (`rhs`는 우변 관례) |
+| `Iterator` | `fn next(&mut self) -> Option<Self::Item>` | `for x in obj` 루프 순회 가능하게 함 (`std::ranges` / 반복자) |
+| `Deref` | `fn deref(&self) -> &Self::Target` | `*` 연산자 역참조, 자동 타입 강제 (`operator*`, `operator->`) |
+| `Fn` / `FnMut` / `FnOnce` | `fn call(...)` 등 | 클로저 호출 방식 분류 (`std::function` / 람다 캡처) |
+| `Send` / `Sync` | 마커 트레이트 (메서드 없음) | 스레드 간 소유권 이동 / 참조 공유 안전성 마커 |
+
+`Clone`과 `Copy`의 차이를 명확히 구분하세요:
+* **`Copy`**: 스택 메모리의 단순 비트 복사(`memcpy`, C++의 `trivially copyable`에 해당). `#[derive(Copy, Clone)]` 형태로 사용하며, `String`, `Box` 등 힙 자원을 가진 타입이나 `Drop`을 구현한 타입은 구현할 수 없습니다.
+* **`Clone`**: `.clone()`을 명시적으로 호출해 수행하는 복제이며, 힙 메모리 재할당을 동반하는 깊은 복사를 수행할 수 있습니다.
 
 ### 9.3. `Default`: 기본값 만들기 (C++: 기본 생성자 · `{}` 초기화)
 
@@ -3067,3 +3106,72 @@ C++은 C ABI와 동일한 ABI를 보장하지 않습니다. C++과 Rust의 직�
 - The Rustonomicon (`unsafe`와 메모리 모델): https://doc.rust-lang.org/nomicon/
 - The Rust API Guidelines: https://rust-lang.github.io/api-guidelines/
 
+
+
+---
+
+<div style="break-before: page; page-break-before: always;"></div>
+
+## 부록 C. 🦀 Rust 핵심 문법 & 메모리 치트시트 (C++ / Python 3자 비교)
+
+C++ 및 Python 개발자가 Rust 코드를 작성하거나 리뷰할 때 가장 자주 참조하게 되는 5대 핵심 문법과 메모리 모델 규칙을 일목요연하게 정리한 치트시트입니다.
+
+---
+
+### 1. 메서드와 `self`, `Self`
+
+* **`self`의 위치와 지위**: 반드시 첫 번째 매개변수여야 하는 **정식 예약어(Keyword)**입니다. (Python의 `self`와 역할이 같지만, Python은 단순 관례일 뿐이고 Rust는 언어 키워드로 강제합니다.)
+* **타입 생략 (문법 설탕 - Syntactic Sugar)**: `impl` 블록 안에서 첫 번째 인자가 `self`일 때만 타입을 생략할 수 있습니다.
+  * `self` ➔ `self: Self` (값으로 소유권을 완전히 가져와 소비/파괴하는 메서드)
+  * `&self` ➔ `self: &Self` (불변 참조 빌림, C++의 `const` 멤버 함수에 해당)
+  * `&mut self` ➔ `self: &mut Self` (가변 참조 빌림, 인스턴스 내부 값을 수정하는 메서드)
+* **자동 역참조 (Auto-dereferencing)**: `&mut self` 같은 참조자라도 C++처럼 `(*self).name`이나 `self->name`을 쓸 필요 없이, 점(`.`) 연산자가 자동으로 역참조를 수행하므로 `self.name`으로 바로 접근합니다.
+* **소문자 `self` vs 대문자 `Self`**:
+  * `self`: 현재 호출된 **인스턴스(값)**
+  * `Self`: 현재 구조체/트레이트의 **타입(설계도)** (예: `fn new(n: T) -> Self`)
+
+---
+
+### 2. 가변성 (`mut`)과 소유권 / 힙 할당 (`Box<T>`)
+
+* **가변성 원칙 (상속된 가변성 - Inherited Mutability)**: 구조체 정의 시 개별 멤버에 `mut`를 적지 않습니다 (`struct Foo { mut x: i32 }`는 컴파일 에러). 변수 바인딩 선언 시 `let mut s = ...`를 붙이면 모든 멤버가 자동으로 가변 상태가 됩니다. (특정 필드만 수정하려면 C++의 `mutable`과 유사하게 `Cell<T>` / `RefCell<T>` 내부 가변성 패턴을 사용합니다.)
+* **힙 할당 (`Box<T>`)**: C++의 `std::unique_ptr<T>`와 같습니다.
+  * **3대 핵심 용도**:
+    1. **컴파일 타임 크기 확정**: 재귀적 데이터 구조체(Linked List, Tree, AST)의 크기 확정.
+    2. **Move 비용 절감**: 대용량 데이터를 힙에 두고 스택에서는 8바이트 주소만 복사하여 Move 비용 절감 및 스택 오버플로우 방지.
+    3. **동적 다형성**: `Box<dyn Trait>`를 통한 vtable 기반 다형성 구현.
+  * **C++과의 차이점**: Move 이후 원본 변수 접근이 **컴파일 타임에 원천 차단**됩니다 (C++의 `nullptr` 댕글링 위험 없음).
+
+---
+
+### 3. 속성 (`#[...]`)과 자동 구현 (`#[derive]`)
+
+* **`#[must_use]`**: C++의 `[[nodiscard]]`와 같습니다. 함수의 반환값을 변수에 바인딩하거나 처리하지 않으면 컴파일 경고가 발생합니다. 의도적으로 결과를 버릴 때는 `let _ = func();` 관례를 사용합니다.
+* **`#[derive(...)]`**: C++의 `= default`와 같습니다. 모든 멤버 필드를 1:1로 대응시켜 기본 트레이트 구현 코드를 자동 생성합니다.
+  * 주요 항목: `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `Default`
+* **`Copy` vs `Clone`**:
+  * **`Copy`**: 스택 메모리의 단순 비트 복사 (`memcpy`, C++의 `trivially copyable`). `#[derive(Copy, Clone)]` 형태로 사용하며, `String`, `Box` 등 힙 자원을 가진 타입이나 `Drop`을 구현한 타입은 구현할 수 없습니다.
+  * **`Clone`**: `.clone()`을 명시적으로 호출해 수행하는 깊은 복사 (독립된 힙 할당 수반 가능).
+
+---
+
+### 4. 트레이트 구현 (`impl Trait for Type`)
+
+C++의 연산자 오버로딩, 소멸자, 인터페이스 상속은 Rust에서 모두 **`impl [트레이트] for [타입]`** 문법 하나로 일관되게 구현합니다 (여기서 `for`는 "~를 위하여"라는 뜻입니다).
+
+| 트레이트 | 핵심 구현 메서드 시그니처 | 역할 및 C++ 대응 개념 |
+| :--- | :--- | :--- |
+| `Drop` | `fn drop(&mut self)` | 스코프 종료 시 자동 실행 (소멸자 `~T()`, 직접 호출 금지, 조기 해제는 `std::mem::drop(x)`) |
+| `Default` | `fn default() -> Self` | 인자 없는 기본값 생성 (기본 생성자 `T() = default`, `{}` 초기화) |
+| `Display` | `fn fmt(&self, f: &mut Formatter) -> Result` | `println!("{}", x)` 사용자용 일반 출력 포맷 (`operator<<`) |
+| `From<T>` | `fn from(val: T) -> Self` | 타입 변환 생성자 (구현 시 `.into()` 자동 생성) |
+| `PartialEq` | `fn eq(&self, other: &Self) -> bool` | `==`, `!=` 연산자 오버로딩 |
+| `Add` | `fn add(self, rhs: Rhs) -> Self::Output` | `+` 연산자 오버로딩 (`rhs`는 우변 관례) |
+| `Iterator` | `fn next(&mut self) -> Option<Self::Item>` | `for x in obj` 루프 순회 가능하게 함 (`std::ranges` / 반복자) |
+
+---
+
+### 5. 제네릭 (`<T>`) 타입 추론과 불변성
+
+* **결정 시점 (지연 양방향 추론)**: 변수가 생성될 때(예: `St::new(20)`) 또는 생성 직후 최초로 호출하는 메서드의 인자 타입(예: `vec.push("apple")`)에 의해 `T`가 단 하나로 지연 확정됩니다.
+* **단일 정적 타입 확정**: 한 번 결정된 `T`는 해당 변수의 수명이 다할 때까지 **절대 다른 타입으로 바꿀 수 없습니다.** (Python 등 동적 타입 언어와의 결정적 차이이며, C++ 템플릿의 컴파일 타임 인스턴스화와 동일한 원리입니다.)

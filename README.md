@@ -27,6 +27,7 @@
 | **15** | [비동기 프로그래밍](#15-비동기-프로그래밍) | `std::future` · coroutine |
 | **16** | [C/C++ 연동과 unsafe](#16-cc-연동과-unsafe) | C ABI · 포인터 · FFI |
 | **17** | [실무 학습 로드맵](#17-실무-학습-로드맵) | 프로젝트 전환 |
+| **부록** | [🦀 핵심 문법 & 메모리 치트시트 (C++ / Python 비교)](#-핵심-문법--메모리-치트시트-c--python-비교) | 5대 핵심 문법 요약표 |
 
 ---
 
@@ -60,26 +61,28 @@
 3. **수명(Lifetimes):** 참조가 유효한 기간을 서술하는 장치(`&'a T`). 대부분 컴파일러가 추론함.
 
 ## 6. 포인터와 스마트 포인터
-* **`Box<T>`:** 단독 소유 힙 포인터 (`std::unique_ptr` 대응).
+* **`Box<T>`:** 단독 소유 힙 포인터 (`std::unique_ptr` 대응). 재귀 타입 크기 확정, Move 비용 절감, `dyn Trait` 다형성에 필수이며 Move 후 컴파일 타임에 원본 접근을 원천 차단(댕글링 위험 없음).
 * **`Rc<T>` / `Arc<T>`:** 공유 소유 (`shared_ptr` 대응). 단일 스레드(`Rc`) / 멀티 스레드(`Arc`).
 * **내부 가변성:** `Cell<T>`(Copy 타입), `RefCell<T>`(런타임 대여 검사)를 통해 불변 객체 내부 수정.
 * **`Weak<T>`:** 순환 참조 방지를 위한 약한 참조 (`std::weak_ptr` 대응).
 
 ## 7. 데이터와 행위의 분리
-* **`struct` + `impl`:** 데이터와 메서드를 분리하여 정의. `&self`는 읽기 전용, `&mut self`는 수정 메서드.
+* **`struct` + `impl`:** 데이터와 메서드를 분리하여 정의. `self`는 정식 예약어로 첫 번째 매개변수 강제(Python 관례와 대비). `self: Self` 문법 설탕, 자동 역참조(`.`) 지원. 구조체 필드 개별 `mut`는 불가하며 바인딩 단위로 가변성 결정.
 * **`enum`:** 단순 정수형을 넘어 다양한 데이터를 담는 상자 (`std::variant`의 상위 호환).
 * **`Option<T>`:** `None` / `Some(T)`를 통한 안전한 null 대체 타입.
 * **패턴 매칭:** `match`와 `if let`을 통한 강력한 구조 분해 및 완전성 검사.
 
 ## 8. 트레이트와 다형성
 * **트레이트(Trait):** 상속 대신 "이런 행위를 할 수 있다"는 규격(인터페이스/컨셉트).
-* **디스패치:** 제네릭을 통한 정적 디스패치(`impl Trait`, 제네릭)와 `dyn Trait`을 통한 동적 디스패치.
+* **디스패치 & 타입 추론:** 제네릭을 통한 정적 디스패치와 `dyn Trait` 동적 디스패치. 제네릭 `<T>`는 첫 사용/메서드 호출 문맥까지 보고 지연 확정되나 한 번 정해지면 불변(정적 단일 타입 보장).
 * **클로저:** `Fn`, `FnMut`, `FnOnce` 트레이트를 통해 주변 환경 캡처 방식을 정밀하게 제어.
 * **이터레이터:** `map`, `filter`, `collect` 등 지연 평가 체인 제공 (`std::ranges` 대응).
 
 ## 9. 표준 트레이트
-* **`#[derive(...)]`:** `Debug`, `Clone`, `Copy`, `PartialEq`, `Eq`, `Default` 자동 생성.
-* **주요 트레이트:** `Default`(기본값), `Clone`/`Copy`(복사), `Drop`(소멸자), `Deref`(역참조), `From`/`Into`(변환), `Send`/`Sync`(스레드 안전성).
+* **`impl Trait for Type`:** C++의 연산자 오버로딩, 소멸자, 특수 멤버 함수가 모두 트레이트 하나로 일관되게 구현됨.
+* **속성 & derive:** `#[derive(...)]`는 C++의 `= default`에 대응. `#[must_use]`는 `[[nodiscard]]`에 대응(`let _ = func();`로 무시).
+* **주요 트레이트:** `Drop`(`~T()`), `Default`(`T()`), `Display`(`operator<<`), `From`(`into()`), `PartialEq`(`==`), `Add`(`+`), `Iterator`(`next()`).
+* **`Copy` vs `Clone`:** `Copy`는 스택 단순 비트 복사(`memcpy`, TriviallyCopyable, 힙 자원 불가), `Clone`은 명시적 복제.
 
 ## 10. 모듈 시스템
 * **`mod`:** 파일 구조와 1:1로 매핑되는 모듈 트리.
@@ -119,3 +122,18 @@
 ---
 
 > 💡 **상세한 코드 예제와 C++ 직접 비교 구문**은 [rust4cpp.md](./rust4cpp.md)에서 확인하실 수 있습니다.
+
+
+---
+
+## 🦀 핵심 문법 & 메모리 치트시트 (C++ / Python 비교)
+
+상세 해설은 원본 문서인 [`rust4cpp.md` 부록 C](./rust4cpp.md#부록-c--rust-핵심-문법--메모리-치트시트-c--python-3자-비교)에서 확인하실 수 있습니다.
+
+| 번호 | 핵심 주제 | 요약 및 C++ / Python 비교 |
+| :---: | :--- | :--- |
+| **1** | **메서드와 `self`, `Self`** | • `self`는 정식 예약어로 첫 번째 매개변수 강제 (Python의 관례와 대비)<br>• 문법 설탕: `self` ➔ `self: Self` (소비), `&self` ➔ `self: &Self` (불변), `&mut self` ➔ `self: &mut Self` (가변)<br>• 자동 역참조: `&mut self`여도 `self.name`으로 직접 접근 (`->` 불필요)<br>• `self`(인스턴스/값) vs `Self`(현재 타입/설계도) |
+| **2** | **가변성 (`mut`) & `Box<T>`** | • 구조체 필드 개별 `mut` 불가 (상속된 가변성, 필요 시 `RefCell<T>` 내부 가변성 사용)<br>• `Box<T>`: `std::unique_ptr<T>` 대응 (재귀 크기 확정, Move 비용 절감, `dyn Trait`)<br>• Move 즉시 원본 접근 컴파일 타임 차단 (C++ `nullptr` 댕글링 위험 없음) |
+| **3** | **속성 & 자동 구현 (`#[derive]`)** | • `#[must_use]`: C++ `[[nodiscard]]` 대응 (의도적 무시는 `let _ = func();`)<br>• `#[derive(...)]`: C++ `= default` 대응 (Debug, Clone, Copy, PartialEq, Eq, Default)<br>• `Copy`(스택 비트 복사, 힙 자원 불가) vs `Clone`(명시적 복제) |
+| **4** | **트레이트 구현 (`impl Trait for Type`)** | • C++의 모든 특수 멤버/연산자 오버로딩을 일관된 문법으로 구현<br>• `Drop`(`~T()`), `Default`(`T()`), `Display`(`operator<<`), `From`(`into()`), `PartialEq`(`==`), `Add`(`+`), `Iterator`(`next()`) |
+| **5** | **제네릭 (`<T>`) 타입 추론** | • 생성 시점 또는 직후 최초 메서드 호출(예: `vec.push("a")`)로 지연 확정<br>• 확정된 `T`는 절대 불변 (정적 단일 타입 보장, C++ 템플릿과 동일, Python 동적 바인딩과 대비) |
